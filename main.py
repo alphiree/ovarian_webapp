@@ -182,7 +182,7 @@ with results:
         st.markdown(
             f""" ##### {len(ovarian_images)} \
             {'image was' if len(ovarian_images) == 1 else 'images were'} uploaded, \
-            overallprediction is: :{PRED_TEXT_COLOR}[**{overall_pred.upper()}**] 
+            overall prediction is: :{PRED_TEXT_COLOR}[**{overall_pred.upper()}**] 
             """
         )
 
