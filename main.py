@@ -7,16 +7,15 @@ breakdown of the income components including basic salary, allowance, night diff
 income, employee contributions, monthly tax, and monthly net income.
 """
 
-from datetime import datetime
-
-import cv2
 import keras
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
 import tensorflow as tf
 
 from config.site_config import div_configs
+from utils.heatmap import generate_heatmap
 from utils.utils import SessionState
 
 ## ======================================================================================= ##
@@ -100,6 +99,10 @@ with title:
 
 with contents:
     st.subheader("Upload Image/s:")
+    st.info(
+        "It is recommended to upload up to 5 images per case for better evaluation."
+    )
+
     ovarian_images = st.file_uploader(
         "Choose a .jpg or .png file",
         accept_multiple_files=True,
@@ -126,7 +129,7 @@ with results:
         st.subheader("Result")
 
         images_to_be_evaluated = {}
-        init_image_num = 1
+        init_image_num = 1  # pylint: disable=invalid-name
         for image in ovarian_images:
             bytes_data = image.getvalue()
             image = tf.image.decode_image(bytes_data)[..., :3]
@@ -169,27 +172,59 @@ with results:
             malignant_value = results_df_grouped["average_pred_1"].values[1]
 
             if benign_value > malignant_value:
-                overall_pred = "Benign"
+                overall_pred = "Benign"  # pylint: disable=invalid-name
             else:
-                overall_pred = "Malignant"
+                overall_pred = "Malignant"  # pylint: disable=invalid-name
         else:
             overall_pred = results_df["predicted_value"].value_counts().idxmax()
 
-        prediction_text_color = "green" if overall_pred == "Benign" else "red"
+        PRED_TEXT_COLOR = "green" if overall_pred == "Benign" else "red"
         st.markdown(
-            f"""
-        ##### {len(ovarian_images)} {'image was' if len(ovarian_images) == 1 else 'images were'}  uploaded, overall prediction is: :{prediction_text_color}[**{overall_pred.upper()}**]
-        """
+            f""" ##### {len(ovarian_images)} \
+            {'image was' if len(ovarian_images) == 1 else 'images were'} uploaded, \
+            overallprediction is: :{PRED_TEXT_COLOR}[**{overall_pred.upper()}**] 
+            """
         )
 
-        st.write(results_df)
+        # st.write(results_df)
 
         ## Generating heatmap
+
+        st.markdown(
+            """
+            ##### Here are the regions of interest for the predicted class in the images uploaded:
+            """
+        )
 
         index_pred = list(
             results_df[results_df["predicted_value"] == overall_pred].index
         )
         index_pred = [value - 1 for value in index_pred]
 
+        bytes_data = ovarian_images[0].getvalue()
+        image = tf.image.decode_image(bytes_data)[..., :3]
+
+        superimposed_img, prediction = generate_heatmap(
+            model=model,
+            decoded_image=image,
+        )
+
+        init_subplot_fig = 0  # pylint: disable=invalid-name
+        fig = plt.figure(figsize=(9, 6))
         for predicted_images_index in index_pred:
-            st.image(ovarian_images[predicted_images_index], width=500)
+            if init_subplot_fig > 3:
+                break
+            plt.subplot(2, 2, init_subplot_fig + 1)
+            bytes_data = ovarian_images[predicted_images_index].getvalue()
+            image = tf.image.decode_image(bytes_data)[..., :3]
+            superimposed_img, prediction = generate_heatmap(
+                model=model,
+                decoded_image=image,
+            )
+            plt.axis("off")
+            plt.title("Predicted Class: " + CLASS_NAMES[np.argmax(prediction)])
+            plt.imshow(superimposed_img)
+            plt.tight_layout()
+
+            init_subplot_fig += 1
+        st.pyplot(fig)
